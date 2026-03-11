@@ -6,6 +6,30 @@ from PIL import Image
 from torchvision import transforms
 
 
+def select_device(device_arg='auto'):
+    if device_arg == 'auto':
+        if torch.cuda.is_available():
+            return torch.device('cuda')
+        if torch.backends.mps.is_available():
+            return torch.device('mps')
+        return torch.device('cpu')
+
+    if device_arg == 'cuda':
+        if not torch.cuda.is_available():
+            raise ValueError('CUDA is not available on this machine.')
+        return torch.device('cuda')
+
+    if device_arg == 'mps':
+        if not torch.backends.mps.is_available():
+            raise ValueError('MPS is not available on this machine.')
+        return torch.device('mps')
+
+    if device_arg == 'cpu':
+        return torch.device('cpu')
+
+    raise ValueError(f"Unknown device: {device_arg}")
+
+
 def get_palette():
     palette = np.array([[i, i, i] for i in range(256)], dtype=np.uint8)
     palette[:16] = np.array([
@@ -43,12 +67,12 @@ def get_model(arch, num_classes, base_ch):
 
 
 def predict(args):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = select_device(args.device)
     palette = get_palette()
 
     # Load model
     model = get_model(args.arch, args.num_classes, args.base_ch)
-    checkpoint = torch.load(args.checkpoint, map_location=device)
+    checkpoint = torch.load(args.checkpoint, map_location='cpu')
     ckpt_arch = checkpoint.get('arch')
     if ckpt_arch is not None and ckpt_arch != args.arch:
         raise ValueError(f"Checkpoint arch is '{ckpt_arch}', but --arch is '{args.arch}'.")
@@ -57,7 +81,7 @@ def predict(args):
     model.eval()
     print(
         f"Loaded {args.arch} checkpoint "
-        f"(epoch {checkpoint['epoch']}, F-score {checkpoint['f_score']:.4f})"
+        f"(epoch {checkpoint['epoch']}, F-score {checkpoint['f_score']:.4f}) on {device}"
     )
 
     # Transform
@@ -109,6 +133,8 @@ if __name__ == '__main__':
     parser.add_argument('--output_dir', type=str, default='./predictions')
     parser.add_argument('--num_classes', type=int, default=19)
     parser.add_argument('--img_size', type=int, default=512)
-    parser.add_argument('--base_ch', type=int, default=15)
+    parser.add_argument('--base_ch', type=int, default=32)
+    parser.add_argument('--device', type=str, default='auto',
+                        choices=['auto', 'cpu', 'cuda', 'mps'])
     args = parser.parse_args()
     predict(args)

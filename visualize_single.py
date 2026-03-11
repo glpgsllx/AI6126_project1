@@ -6,7 +6,7 @@ import torch
 from PIL import Image
 from torchvision import transforms
 
-from predict import get_model, get_palette
+from predict import get_model, get_palette, select_device
 
 
 def overlay_mask(image, mask, alpha=0.4):
@@ -18,10 +18,10 @@ def overlay_mask(image, mask, alpha=0.4):
 
 
 def infer_single(args):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    device = select_device(args.device)
     model = get_model(args.arch, args.num_classes, args.base_ch)
 
-    checkpoint = torch.load(args.checkpoint, map_location=device)
+    checkpoint = torch.load(args.checkpoint, map_location="cpu")
     ckpt_arch = checkpoint.get("arch")
     if ckpt_arch is not None and ckpt_arch != args.arch:
         raise ValueError(f"Checkpoint arch is '{ckpt_arch}', but --arch is '{args.arch}'.")
@@ -29,6 +29,10 @@ def infer_single(args):
     model.load_state_dict(checkpoint["model_state_dict"])
     model = model.to(device)
     model.eval()
+    print(
+        f"Loaded {args.arch} checkpoint "
+        f"(epoch {checkpoint['epoch']}, F-score {checkpoint['f_score']:.4f}) on {device}"
+    )
 
     image = Image.open(args.image_path).convert("RGB")
     orig_size = image.size
@@ -64,8 +68,8 @@ def infer_single(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--image_path", default="/home/work/ldv-fs-sg/chenyixuan/seg/data/val/images/0a4fdac4e7f448718c42f34a5422aee2.jpg", type=str)
-    parser.add_argument("--checkpoint", default="/home/work/ldv-fs-sg/chenyixuan/seg/checkpoints/deeplab_d7c3/best_model.pth", type=str)
+    parser.add_argument("--image_path", default="/Users/chenyixuan/Documents/NTU课程/ACV/AI6126_project1/data/val/images/0a4fdac4e7f448718c42f34a5422aee2.jpg", type=str)
+    parser.add_argument("--checkpoint", default="/Users/chenyixuan/Documents/NTU课程/ACV/AI6126_project1/checkpoints/deeplab/weighted_sqrt_d7c3_st20/best_model.pth", type=str)
     parser.add_argument("--arch", type=str, default="deeplab",
                         choices=["attention_unet", "deeplab", "segnet"])
     parser.add_argument("--output_dir", type=str, default="./visualizations")
@@ -73,5 +77,7 @@ if __name__ == "__main__":
     parser.add_argument("--img_size", type=int, default=512)
     parser.add_argument("--base_ch", type=int, default=32)
     parser.add_argument("--alpha", type=float, default=0.4)
+    parser.add_argument("--device", type=str, default="auto",
+                        choices=["auto", "cpu", "cuda", "mps"])
     args = parser.parse_args()
     infer_single(args)

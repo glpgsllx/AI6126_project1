@@ -24,4 +24,6 @@ env/
 
 # Local datasets (usually large, keep out of git)
 data/*
-
+visualizations/*
+submission_work/*
+submissions/*
