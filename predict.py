@@ -5,6 +5,30 @@ import numpy as np
 from PIL import Image
 from torchvision import transforms
 
+
+def get_palette():
+    palette = np.array([[i, i, i] for i in range(256)], dtype=np.uint8)
+    palette[:16] = np.array([
+        [0, 0, 0],
+        [128, 0, 0],
+        [0, 128, 0],
+        [128, 128, 0],
+        [0, 0, 128],
+        [128, 0, 128],
+        [0, 128, 128],
+        [128, 128, 128],
+        [64, 0, 0],
+        [191, 0, 0],
+        [64, 128, 0],
+        [191, 128, 0],
+        [64, 0, 128],
+        [191, 0, 128],
+        [64, 128, 128],
+        [191, 128, 128],
+    ], dtype=np.uint8)
+    return palette.reshape(-1).tolist()
+
+
 def get_model(arch, num_classes, base_ch):
     if arch == 'attention_unet':
         from src.model import AttentionUNet
@@ -20,6 +44,7 @@ def get_model(arch, num_classes, base_ch):
 
 def predict(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    palette = get_palette()
 
     # Load model
     model = get_model(args.arch, args.num_classes, args.base_ch)
@@ -65,6 +90,7 @@ def predict(args):
             # Resize back to original size
             pred_img = Image.fromarray(pred)
             pred_img = pred_img.resize(orig_size, Image.NEAREST)
+            pred_img.putpalette(palette)
 
             base_name = os.path.splitext(img_name)[0]
             out_path = os.path.join(args.output_dir, base_name + '.png')

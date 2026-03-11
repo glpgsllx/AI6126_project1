@@ -38,10 +38,17 @@ class DiceLoss(nn.Module):
 
 
 class CombinedLoss(nn.Module):
-    def __init__(self, num_classes=19, dice_weight=0.5, ce_weight=0.5, ignore_index=255):
+    def __init__(
+        self,
+        num_classes=19,
+        dice_weight=0.5,
+        ce_weight=0.5,
+        ignore_index=255,
+        ce_class_weights=None,
+    ):
         super().__init__()
         self.dice = DiceLoss(ignore_index=ignore_index)
-        self.ce = nn.CrossEntropyLoss(ignore_index=ignore_index)
+        self.ce = nn.CrossEntropyLoss(weight=ce_class_weights, ignore_index=ignore_index)
         self.dice_weight = dice_weight
         self.ce_weight = ce_weight
 

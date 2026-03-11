@@ -8,9 +8,42 @@ from torch.utils.data import DataLoader, Subset
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import numpy as np
+from PIL import Image
 
 from src.dataset import FaceParsingDataset
 from src.losses import CombinedLoss
+
+
+def compute_class_weights(mask_dir, num_classes, scheme="median_freq", transform="none", clip_max=0.0):
+    counts = np.zeros(num_classes, dtype=np.int64)
+    for file_name in os.listdir(mask_dir):
+        if not file_name.lower().endswith((".png", ".jpg", ".jpeg")):
+            continue
+        mask = np.array(Image.open(os.path.join(mask_dir, file_name)), dtype=np.int64)
+        vals, cnts = np.unique(mask, return_counts=True)
+        for val, cnt in zip(vals.tolist(), cnts.tolist()):
+            if 0 <= val < num_classes:
+                counts[val] += cnt
+
+    freqs = counts / max(counts.sum(), 1)
+    positive = freqs > 0
+    weights = np.ones(num_classes, dtype=np.float32)
+
+    if scheme == "median_freq":
+        median_freq = np.median(freqs[positive])
+        weights[positive] = (median_freq / freqs[positive]).astype(np.float32)
+    else:
+        raise ValueError(f"Unknown class weight scheme: {scheme}")
+
+    if transform == "sqrt":
+        weights = np.sqrt(weights).astype(np.float32)
+    elif transform != "none":
+        raise ValueError(f"Unknown class weight transform: {transform}")
+
+    if clip_max > 0:
+        weights = np.minimum(weights, clip_max).astype(np.float32)
+
+    return torch.tensor(weights, dtype=torch.float32)
 
 
 def save_metrics_csv(csv_path, history):
@@ -247,11 +280,31 @@ def main(args):
         except Exception as e:
             print(f"torch.compile unavailable, fallback to eager mode: {e}")
 
-    criterion = CombinedLoss(num_classes=args.num_classes)
+    ce_class_weights = None
+    if args.weighted_ce != 'none':
+        ce_class_weights = compute_class_weights(
+            train_mask_dir,
+            args.num_classes,
+            scheme=args.weighted_ce,
+            transform=args.weighted_ce_transform,
+            clip_max=args.weighted_ce_clip_max,
+        ).to(device)
+        print(f"Using weighted CE: {args.weighted_ce}")
+        print(f"Weight transform: {args.weighted_ce_transform} | clip_max: {args.weighted_ce_clip_max}")
+        print(f"CE class weights: {[round(float(x), 4) for x in ce_class_weights.cpu().tolist()]}")
+
+    criterion = CombinedLoss(
+        num_classes=args.num_classes,
+        dice_weight=args.dice_weight,
+        ce_weight=args.ce_weight,
+        ce_class_weights=ce_class_weights,
+    )
     optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
 
     save_dir = os.path.join(args.save_dir, args.arch)
+    if args.exp_name:
+        save_dir = os.path.join(save_dir, args.exp_name)
     os.makedirs(save_dir, exist_ok=True)
     metrics_csv_path = os.path.join(save_dir, 'metrics.csv')
     metrics_plot_path = os.path.join(save_dir, 'metrics.png')
@@ -266,6 +319,7 @@ def main(args):
 
     best_f_score = 0.0
     best_train_loss = float('inf')
+    epochs_without_improve = 0
     for epoch in range(1, args.epochs + 1):
         train_loss = train_one_epoch(
             model, train_loader, optimizer, criterion, device,
@@ -283,6 +337,7 @@ def main(args):
 
             if f_score > best_f_score:
                 best_f_score = f_score
+                epochs_without_improve = 0
                 torch.save({
                     'epoch': epoch,
                     'arch': args.arch,
@@ -290,6 +345,8 @@ def main(args):
                     'f_score': f_score,
                 }, os.path.join(save_dir, 'best_model.pth'))
                 print(f"  >>> Saved best (F={f_score:.4f})")
+            else:
+                epochs_without_improve += 1
         else:
             print(f"[{args.arch}] Epoch {epoch:03d}/{args.epochs} | Train: {train_loss:.4f} | LR: {lr_now:.2e}")
             if train_loss < best_train_loss:
@@ -308,6 +365,14 @@ def main(args):
         history['val_loss'].append(val_loss)
         history['f_score'].append(f_score)
         save_metrics_csv(metrics_csv_path, history)
+
+        if val_loader is not None and args.early_stop_patience > 0:
+            if epochs_without_improve >= args.early_stop_patience:
+                print(
+                    f"Early stopping at epoch {epoch}: no F-score improvement for "
+                    f"{args.early_stop_patience} epoch(s)."
+                )
+                break
 
     save_metrics_plot(metrics_plot_path, history)
     print(f"Saved metrics csv: {metrics_csv_path}")
@@ -346,5 +411,19 @@ if __name__ == '__main__':
                         help='If >0, split this fraction from train set as validation.')
     parser.add_argument('--split_seed', type=int, default=42,
                         help='Random seed for train/val split when --val_split > 0.')
+    parser.add_argument('--early_stop_patience', type=int, default=0,
+                        help='Stop early after this many validation epochs without F-score improvement. 0 disables.')
+    parser.add_argument('--exp_name', type=str, default='',
+                        help='Optional experiment name. Saves outputs under save_dir/arch/exp_name.')
+    parser.add_argument('--weighted_ce', type=str, default='none',
+                        choices=['none', 'median_freq'],
+                        help='Optional class weighting scheme for CrossEntropyLoss.')
+    parser.add_argument('--weighted_ce_transform', type=str, default='none',
+                        choices=['none', 'sqrt'],
+                        help='Optional transform applied to CE class weights.')
+    parser.add_argument('--weighted_ce_clip_max', type=float, default=0.0,
+                        help='If > 0, clip CE class weights to this maximum value.')
+    parser.add_argument('--dice_weight', type=float, default=0.5)
+    parser.add_argument('--ce_weight', type=float, default=0.5)
     args = parser.parse_args()
     main(args)

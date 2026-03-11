@@ -1,0 +1,1 @@
+DATA_DIR=./data ARCH=deeplab VAL_SPLIT=0.15 EARLY_STOP_PATIENCE=8 ./run_train.sh

@@ -21,11 +21,6 @@ env/
 # Logs
 *.log
 
-# Training artifacts
-checkpoints/*
-predictions/*
-!checkpoints/.gitkeep
-!predictions/.gitkeep
 
 # Local datasets (usually large, keep out of git)
 data/*
