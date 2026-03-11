@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Python cache/build
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Logs
+*.log
+
+# Training artifacts
+checkpoints/*
+predictions/*
+!checkpoints/.gitkeep
+!predictions/.gitkeep
+
+# Local datasets (usually large, keep out of git)
+data/*
+

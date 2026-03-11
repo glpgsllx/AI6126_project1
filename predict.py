@@ -3,22 +3,37 @@ import argparse
 import torch
 import numpy as np
 from PIL import Image
-from torch.utils.data import DataLoader
 from torchvision import transforms
 
-from model import AttentionUNet
+def get_model(arch, num_classes, base_ch):
+    if arch == 'attention_unet':
+        from src.model import AttentionUNet
+        return AttentionUNet(in_ch=3, num_classes=num_classes, base_ch=base_ch)
+    if arch == 'deeplab':
+        from src.model_b_deeplab import LightDeepLab
+        return LightDeepLab(in_ch=3, num_classes=num_classes, base_ch=base_ch)
+    if arch == 'segnet':
+        from src.model_c_segnet import LightSegNet
+        return LightSegNet(in_ch=3, num_classes=num_classes, base_ch=base_ch)
+    raise ValueError(f"Unknown arch: {arch}")
 
 
 def predict(args):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Load model
-    model = AttentionUNet(in_ch=3, num_classes=args.num_classes, base_ch=args.base_ch)
+    model = get_model(args.arch, args.num_classes, args.base_ch)
     checkpoint = torch.load(args.checkpoint, map_location=device)
+    ckpt_arch = checkpoint.get('arch')
+    if ckpt_arch is not None and ckpt_arch != args.arch:
+        raise ValueError(f"Checkpoint arch is '{ckpt_arch}', but --arch is '{args.arch}'.")
     model.load_state_dict(checkpoint['model_state_dict'])
     model = model.to(device)
     model.eval()
-    print(f"Loaded checkpoint (epoch {checkpoint['epoch']}, F-score {checkpoint['f_score']:.4f})")
+    print(
+        f"Loaded {args.arch} checkpoint "
+        f"(epoch {checkpoint['epoch']}, F-score {checkpoint['f_score']:.4f})"
+    )
 
     # Transform
     transform = transforms.Compose([
@@ -60,12 +75,14 @@ def predict(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('--arch', type=str, default='attention_unet',
+                        choices=['attention_unet', 'deeplab', 'segnet'])
     parser.add_argument('--test_dir', type=str, required=True,
                         help='Directory containing test images')
-    parser.add_argument('--checkpoint', type=str, default='./checkpoints/best_model.pth')
+    parser.add_argument('--checkpoint', type=str, default='./checkpoints/attention_unet/best_model.pth')
     parser.add_argument('--output_dir', type=str, default='./predictions')
     parser.add_argument('--num_classes', type=int, default=19)
     parser.add_argument('--img_size', type=int, default=512)
-    parser.add_argument('--base_ch', type=int, default=32)
+    parser.add_argument('--base_ch', type=int, default=15)
     args = parser.parse_args()
     predict(args)
