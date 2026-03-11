@@ -9,11 +9,13 @@ import random
 
 
 class FaceParsingDataset(Dataset):
-    def __init__(self, img_dir, mask_dir, img_size=512, augment=False):
+    def __init__(self, img_dir, mask_dir, img_size=512, augment=False, num_classes=19, ignore_index=255):
         self.img_dir = img_dir
         self.mask_dir = mask_dir
         self.img_size = img_size
         self.augment = augment
+        self.num_classes = num_classes
+        self.ignore_index = ignore_index
 
         self.images = sorted([
             f for f in os.listdir(img_dir)
@@ -36,7 +38,8 @@ class FaceParsingDataset(Dataset):
             mask_path = os.path.join(self.mask_dir, base_name + ext)
             if os.path.exists(mask_path):
                 break
-        mask = Image.open(mask_path).convert('L')
+        # Keep indexed class ids from palette masks; do not convert to grayscale.
+        mask = Image.open(mask_path)
 
         # Resize
         image = image.resize((self.img_size, self.img_size), Image.BILINEAR)
@@ -50,7 +53,11 @@ class FaceParsingDataset(Dataset):
         image = TF.to_tensor(image)
         image = TF.normalize(image, mean=[0.485, 0.456, 0.406],
                                       std=[0.229, 0.224, 0.225])
-        mask = torch.from_numpy(np.array(mask)).long()
+        mask_np = np.array(mask, dtype=np.int64)
+        invalid = (mask_np < 0) | (mask_np >= self.num_classes)
+        if invalid.any():
+            mask_np[invalid] = self.ignore_index
+        mask = torch.from_numpy(mask_np).long()
 
         return image, mask
 

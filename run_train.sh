@@ -18,6 +18,8 @@ NUM_WORKERS="${NUM_WORKERS:-0}"
 PREFETCH_FACTOR="${PREFETCH_FACTOR:-2}"
 COMPILE_MODE="${COMPILE_MODE:-default}" # default | reduce-overhead | max-autotune
 LOG_INTERVAL="${LOG_INTERVAL:-20}"
+VAL_SPLIT="${VAL_SPLIT:-0.0}"
+SPLIT_SEED="${SPLIT_SEED:-42}"
 
 echo "[train] arch=${ARCH} epochs=${EPOCHS} batch_size=${BATCH_SIZE} img_size=${IMG_SIZE}"
 
@@ -37,4 +39,6 @@ python3 -u train.py \
   --no_compile \
   --compile_mode "${COMPILE_MODE}" \
   --matmul_precision high \
-  --log_interval "${LOG_INTERVAL}"
+  --log_interval "${LOG_INTERVAL}" \
+  --val_split "${VAL_SPLIT}" \
+  --split_seed "${SPLIT_SEED}"

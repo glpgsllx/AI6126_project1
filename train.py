@@ -4,7 +4,7 @@ import csv
 import time
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CosineAnnealingLR
 import numpy as np
@@ -89,7 +89,7 @@ def get_model(arch, num_classes, base_ch):
     return model
 
 
-def compute_f_measure(preds, targets, num_classes, ignore_index=255):
+def compute_f_measure(preds, targets, num_classes, ignore_index=255, beta=1.0):
     f_scores = []
     preds = preds.view(-1).cpu().numpy()
     targets = targets.view(-1).cpu().numpy()
@@ -98,16 +98,22 @@ def compute_f_measure(preds, targets, num_classes, ignore_index=255):
     preds = preds[valid]
     targets = targets[valid]
 
-    for cls in range(num_classes):
+    if targets.size == 0:
+        return 0.0
+
+    # Match course metric: average F-score over classes present in GT.
+    for cls in np.unique(targets):
+        cls = int(cls)
         tp = ((preds == cls) & (targets == cls)).sum()
         fp = ((preds == cls) & (targets != cls)).sum()
         fn = ((preds != cls) & (targets == cls)).sum()
         precision = tp / (tp + fp + 1e-8)
         recall = tp / (tp + fn + 1e-8)
-        f = 2 * precision * recall / (precision + recall + 1e-8)
+        beta2 = beta ** 2
+        f = (1 + beta2) * (precision * recall) / (beta2 * precision + recall + 1e-8)
         f_scores.append(f)
 
-    return np.mean(f_scores)
+    return float(np.mean(f_scores)) if f_scores else 0.0
 
 
 def train_one_epoch(model, loader, optimizer, criterion, device, log_interval=0, arch='model', epoch=1, total_epochs=1):
@@ -173,10 +179,17 @@ def main(args):
     if device.type == 'cuda':
         torch.backends.cudnn.benchmark = True
 
+    if not (0.0 <= args.val_split < 1.0):
+        raise ValueError(f"--val_split must be in [0, 1), got {args.val_split}")
+
+    train_img_dir = os.path.join(args.data_dir, 'train', 'images')
+    train_mask_dir = os.path.join(args.data_dir, 'train', 'masks')
+
     train_dataset = FaceParsingDataset(
-        img_dir=os.path.join(args.data_dir, 'train', 'images'),
-        mask_dir=os.path.join(args.data_dir, 'train', 'masks'),
-        img_size=args.img_size, augment=True
+        img_dir=train_img_dir,
+        mask_dir=train_mask_dir,
+        img_size=args.img_size, augment=True,
+        num_classes=args.num_classes, ignore_index=255
     )
     loader_kwargs = {
         'batch_size': args.batch_size,
@@ -187,19 +200,44 @@ def main(args):
         loader_kwargs['persistent_workers'] = args.persistent_workers
         loader_kwargs['prefetch_factor'] = args.prefetch_factor
 
-    train_loader = DataLoader(train_dataset, shuffle=True, **loader_kwargs)
-
-    val_mask_dir = os.path.join(args.data_dir, 'val', 'masks')
     val_loader = None
-    if os.path.isdir(val_mask_dir):
-        val_dataset = FaceParsingDataset(
-            img_dir=os.path.join(args.data_dir, 'val', 'images'),
-            mask_dir=val_mask_dir,
-            img_size=args.img_size, augment=False
+    if args.val_split > 0.0:
+        full_train_aug = train_dataset
+        full_train_noaug = FaceParsingDataset(
+            img_dir=train_img_dir,
+            mask_dir=train_mask_dir,
+            img_size=args.img_size, augment=False,
+            num_classes=args.num_classes, ignore_index=255
         )
-        val_loader = DataLoader(val_dataset, shuffle=False, **loader_kwargs)
+        n = len(full_train_aug)
+        val_size = max(1, int(n * args.val_split))
+        train_size = n - val_size
+        if train_size <= 0:
+            raise ValueError(f"Train split is empty. Reduce --val_split (current {args.val_split}).")
+
+        g = torch.Generator()
+        g.manual_seed(args.split_seed)
+        perm = torch.randperm(n, generator=g).tolist()
+        train_idx = perm[:train_size]
+        val_idx = perm[train_size:]
+
+        train_loader = DataLoader(Subset(full_train_aug, train_idx), shuffle=True, **loader_kwargs)
+        val_loader = DataLoader(Subset(full_train_noaug, val_idx), shuffle=False, **loader_kwargs)
+        print(f"Using train split for validation: train={train_size}, val={val_size}, seed={args.split_seed}")
     else:
-        print("No val masks found. Training without validation metrics.")
+        train_loader = DataLoader(train_dataset, shuffle=True, **loader_kwargs)
+        val_mask_dir = os.path.join(args.data_dir, 'val', 'masks')
+        if os.path.isdir(val_mask_dir):
+            val_dataset = FaceParsingDataset(
+                img_dir=os.path.join(args.data_dir, 'val', 'images'),
+                mask_dir=val_mask_dir,
+                img_size=args.img_size, augment=False,
+                num_classes=args.num_classes, ignore_index=255
+            )
+            val_loader = DataLoader(val_dataset, shuffle=False, **loader_kwargs)
+            print("Using data/val with masks for validation.")
+        else:
+            print("No val masks found. Training without validation metrics.")
 
     model = get_model(args.arch, args.num_classes, args.base_ch).to(device)
     if args.compile:
@@ -304,5 +342,9 @@ if __name__ == '__main__':
     parser.add_argument('--matmul_precision', type=str, default='high',
                         choices=['highest', 'high', 'medium'])
     parser.add_argument('--log_interval', type=int, default=20)
+    parser.add_argument('--val_split', type=float, default=0.0,
+                        help='If >0, split this fraction from train set as validation.')
+    parser.add_argument('--split_seed', type=int, default=42,
+                        help='Random seed for train/val split when --val_split > 0.')
     args = parser.parse_args()
     main(args)

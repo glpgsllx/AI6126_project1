@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 
 class DiceLoss(nn.Module):
-    def __init__(self, smooth=1.0, ignore_index=-1):
+    def __init__(self, smooth=1.0, ignore_index=255):
         super().__init__()
         self.smooth = smooth
         self.ignore_index = ignore_index
@@ -13,8 +13,12 @@ class DiceLoss(nn.Module):
         num_classes = logits.shape[1]
         probs = F.softmax(logits, dim=1)
 
-        # One-hot encode targets
-        mask = (targets != self.ignore_index)
+        # Keep only valid class ids [0, num_classes-1], excluding ignore_index.
+        mask = (
+            (targets != self.ignore_index)
+            & (targets >= 0)
+            & (targets < num_classes)
+        )
         targets_valid = targets.clone()
         targets_valid[~mask] = 0
 
@@ -34,10 +38,10 @@ class DiceLoss(nn.Module):
 
 
 class CombinedLoss(nn.Module):
-    def __init__(self, num_classes=19, dice_weight=0.5, ce_weight=0.5):
+    def __init__(self, num_classes=19, dice_weight=0.5, ce_weight=0.5, ignore_index=255):
         super().__init__()
-        self.dice = DiceLoss()
-        self.ce = nn.CrossEntropyLoss(ignore_index=255)
+        self.dice = DiceLoss(ignore_index=ignore_index)
+        self.ce = nn.CrossEntropyLoss(ignore_index=ignore_index)
         self.dice_weight = dice_weight
         self.ce_weight = ce_weight
 
