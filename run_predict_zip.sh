@@ -3,10 +3,10 @@ set -euo pipefail
 
 # Edit these variables before running.
 arch="deeplab"
-checkpoint="./checkpoints/deeplab/weighted_sqrt_d7c3_st20/best_model.pth"
+checkpoint="/Users/chenyixuan/Documents/NTU课程/ACV/AI6126_project1/checkpoints/deeplab/full/epoch_045.pth"
 test_dir="./data/val/images"
 work_dir="./submission_work"
-zip_name="./weighted_sqrt_d7c3_st20.zip"
+zip_name="./full_e45_wolr_weighted_sqrt_d7c3_st20.zip"
 num_classes="19"
 img_size="512"
 base_ch="32"

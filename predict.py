@@ -100,7 +100,6 @@ def predict(args):
     ])
 
     print(f"Running inference on {len(img_files)} images...")
-
     with torch.no_grad():
         for img_name in img_files:
             img_path = os.path.join(args.test_dir, img_name)

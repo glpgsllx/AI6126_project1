@@ -14,6 +14,30 @@ from src.dataset import FaceParsingDataset
 from src.losses import CombinedLoss
 
 
+def parse_epoch_list(text):
+    if text is None or str(text).strip() == '':
+        return set()
+    epochs = set()
+    for part in str(text).split(','):
+        part = part.strip()
+        if not part:
+            continue
+        value = int(part)
+        if value <= 0:
+            raise ValueError(f"--save_epochs only accepts positive integers, got: {value}")
+        epochs.add(value)
+    return epochs
+
+
+def save_checkpoint(path, epoch, arch, model, f_score):
+    torch.save({
+        'epoch': epoch,
+        'arch': arch,
+        'model_state_dict': model.state_dict(),
+        'f_score': f_score,
+    }, path)
+
+
 def compute_class_weights(mask_dir, num_classes, scheme="median_freq", transform="none", clip_max=0.0):
     counts = np.zeros(num_classes, dtype=np.int64)
     for file_name in os.listdir(mask_dir):
@@ -306,6 +330,7 @@ def main(args):
     if args.exp_name:
         save_dir = os.path.join(save_dir, args.exp_name)
     os.makedirs(save_dir, exist_ok=True)
+    save_epochs = parse_epoch_list(args.save_epochs)
     metrics_csv_path = os.path.join(save_dir, 'metrics.csv')
     metrics_plot_path = os.path.join(save_dir, 'metrics.png')
 
@@ -338,25 +363,27 @@ def main(args):
             if f_score > best_f_score:
                 best_f_score = f_score
                 epochs_without_improve = 0
-                torch.save({
-                    'epoch': epoch,
-                    'arch': args.arch,
-                    'model_state_dict': model.state_dict(),
-                    'f_score': f_score,
-                }, os.path.join(save_dir, 'best_model.pth'))
+                save_checkpoint(
+                    os.path.join(save_dir, 'best_model.pth'),
+                    epoch,
+                    args.arch,
+                    model,
+                    f_score,
+                )
                 print(f"  >>> Saved best (F={f_score:.4f})")
             else:
                 epochs_without_improve += 1
         else:
             print(f"[{args.arch}] Epoch {epoch:03d}/{args.epochs} | Train: {train_loss:.4f} | LR: {lr_now:.2e}")
-            if train_loss < best_train_loss:
+            if args.save_best_train_loss and train_loss < best_train_loss:
                 best_train_loss = train_loss
-                torch.save({
-                    'epoch': epoch,
-                    'arch': args.arch,
-                    'model_state_dict': model.state_dict(),
-                    'f_score': -1.0,
-                }, os.path.join(save_dir, 'best_model.pth'))
+                save_checkpoint(
+                    os.path.join(save_dir, 'best_model.pth'),
+                    epoch,
+                    args.arch,
+                    model,
+                    -1.0,
+                )
                 print(f"  >>> Saved best by train loss ({train_loss:.4f})")
 
         history['epoch'].append(epoch)
@@ -365,6 +392,17 @@ def main(args):
         history['val_loss'].append(val_loss)
         history['f_score'].append(f_score)
         save_metrics_csv(metrics_csv_path, history)
+
+        if epoch in save_epochs:
+            ckpt_path = os.path.join(save_dir, f'epoch_{epoch:03d}.pth')
+            save_checkpoint(
+                ckpt_path,
+                epoch,
+                args.arch,
+                model,
+                -1.0 if f_score is None else f_score,
+            )
+            print(f"  >>> Saved requested checkpoint: {ckpt_path}")
 
         if val_loader is not None and args.early_stop_patience > 0:
             if epochs_without_improve >= args.early_stop_patience:
@@ -375,6 +413,10 @@ def main(args):
                 break
 
     save_metrics_plot(metrics_plot_path, history)
+    if val_loader is None and not args.save_best_train_loss and args.save_last:
+        last_path = os.path.join(save_dir, 'last_model.pth')
+        save_checkpoint(last_path, args.epochs, args.arch, model, -1.0)
+        print(f"Saved last checkpoint: {last_path}")
     print(f"Saved metrics csv: {metrics_csv_path}")
     print(f"Saved metrics plot: {metrics_plot_path}")
 
@@ -425,5 +467,12 @@ if __name__ == '__main__':
                         help='If > 0, clip CE class weights to this maximum value.')
     parser.add_argument('--dice_weight', type=float, default=0.5)
     parser.add_argument('--ce_weight', type=float, default=0.5)
+    parser.add_argument('--save_epochs', type=str, default='',
+                        help='Comma-separated epoch numbers to save extra checkpoints, e.g. "41,45".')
+    parser.add_argument('--save_best_train_loss', action='store_true', default=False,
+                        help='When no validation metrics are available, keep updating best_model.pth by train loss.')
+    parser.add_argument('--save_last', action='store_true', default=True,
+                        help='When no validation metrics are available, save last_model.pth at training end.')
+    parser.add_argument('--no_save_last', action='store_false', dest='save_last')
     args = parser.parse_args()
     main(args)

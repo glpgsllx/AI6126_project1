@@ -62,15 +62,17 @@ class FaceParsingDataset(Dataset):
         return image, mask
 
     def _augment(self, image, mask):
-        # Random horizontal flip
-        if random.random() > 0.5:
-            image = TF.hflip(image)
-            mask = TF.hflip(mask)
-
         # Random rotation
         if random.random() > 0.5:
             angle = random.uniform(-15, 15)
             image = TF.rotate(image, angle, interpolation=Image.BILINEAR)
+            # Optional variant (tested but not selected):
+            # mask = TF.rotate(
+            #     mask,
+            #     angle,
+            #     interpolation=Image.NEAREST,
+            #     fill=self.ignore_index,
+            # )
             mask = TF.rotate(mask, angle, interpolation=Image.NEAREST)
 
         # Random crop and resize

@@ -1,0 +1,1 @@
+ARCH=deeplab EXP_NAME=wolr_weighted_sqrt_d7c3_st20 LR=1e-3 WEIGHTED_CE=median_freq WEIGHTED_CE_TRANSFORM=sqrt DICE_WEIGHT=0.7 CE_WEIGHT=0.3 VAL_SPLIT=0.15 EARLY_STOP_PATIENCE=20 DATA_DIR=/content/AI6126_project1/data /content/AI6126_project1/run_train.sh

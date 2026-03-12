@@ -31,6 +31,9 @@ WEIGHTED_CE_TRANSFORM="${WEIGHTED_CE_TRANSFORM:-none}"
 WEIGHTED_CE_CLIP_MAX="${WEIGHTED_CE_CLIP_MAX:-0}"
 DICE_WEIGHT="${DICE_WEIGHT:-0.5}"
 CE_WEIGHT="${CE_WEIGHT:-0.5}"
+SAVE_EPOCHS="${SAVE_EPOCHS:-}"
+SAVE_BEST_TRAIN_LOSS="${SAVE_BEST_TRAIN_LOSS:-0}"
+SAVE_LAST="${SAVE_LAST:-1}"
 
 case "${ARCH}" in
   attention_unet)
@@ -65,6 +68,14 @@ esac
 
 echo "[train] arch=${ARCH} epochs=${EPOCHS} batch_size=${BATCH_SIZE} img_size=${IMG_SIZE}"
 
+extra_args=()
+if [ "${SAVE_BEST_TRAIN_LOSS}" = "1" ]; then
+  extra_args+=(--save_best_train_loss)
+fi
+if [ "${SAVE_LAST}" = "0" ]; then
+  extra_args+=(--no_save_last)
+fi
+
 python3 -u train.py \
   --arch "${ARCH}" \
   --data_dir "${DATA_DIR}" \
@@ -90,4 +101,6 @@ python3 -u train.py \
   --weighted_ce_transform "${WEIGHTED_CE_TRANSFORM}" \
   --weighted_ce_clip_max "${WEIGHTED_CE_CLIP_MAX}" \
   --dice_weight "${DICE_WEIGHT}" \
-  --ce_weight "${CE_WEIGHT}"
+  --ce_weight "${CE_WEIGHT}" \
+  --save_epochs "${SAVE_EPOCHS}" \
+  "${extra_args[@]}"
