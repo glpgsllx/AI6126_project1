@@ -105,6 +105,49 @@ class FocalCrossEntropyLoss(nn.Module):
         return weighted.sum() / normalizer
 
 
+def lovasz_grad(gt_sorted):
+    """Gradient of the Lovasz extension wrt sorted errors."""
+    gts = gt_sorted.sum()
+    intersection = gts - gt_sorted.float().cumsum(0)
+    union = gts + (1.0 - gt_sorted.float()).cumsum(0)
+    jaccard = 1.0 - intersection / union.clamp_min(1.0)
+    if gt_sorted.numel() > 1:
+        jaccard[1:] = jaccard[1:] - jaccard[:-1]
+    return jaccard
+
+
+class LovaszSoftmaxLoss(nn.Module):
+    def __init__(self, ignore_index=255):
+        super().__init__()
+        self.ignore_index = ignore_index
+
+    def forward(self, logits, targets):
+        probs = F.softmax(logits, dim=1)  # [B, C, H, W]
+        num_classes = probs.shape[1]
+        valid = (targets != self.ignore_index).view(-1)
+        if valid.sum() == 0:
+            return logits.new_tensor(0.0)
+
+        probs = probs.permute(0, 2, 3, 1).reshape(-1, num_classes)[valid]
+        targets = targets.view(-1)[valid]
+
+        losses = []
+        for c in range(num_classes):
+            fg = (targets == c).float()
+            if fg.sum() == 0:
+                continue
+            class_pred = probs[:, c]
+            errors = (fg - class_pred).abs()
+            errors_sorted, perm = torch.sort(errors, descending=True)
+            fg_sorted = fg[perm]
+            grad = lovasz_grad(fg_sorted)
+            losses.append(torch.dot(errors_sorted, grad))
+
+        if not losses:
+            return logits.new_tensor(0.0)
+        return torch.stack(losses).mean()
+
+
 class CombinedLoss(nn.Module):
     def __init__(
         self,
@@ -131,6 +174,8 @@ class CombinedLoss(nn.Module):
                 class_weights=ce_class_weights,
                 gamma=focal_gamma,
             )
+        elif ce_type == 'lovasz':
+            self.ce = LovaszSoftmaxLoss(ignore_index=ignore_index)
         else:
             raise ValueError(f"Unknown ce_type: {ce_type}")
         self.dice_weight = dice_weight

@@ -52,8 +52,17 @@
 - 对比结论：当前不采用 `fill=255` 这一改动作为最终提交方案，最终全量训练优先使用“仅去掉水平翻转”的版本。
 - 在当前最佳开发配置 `wolr_weighted_sqrt_d7c3_st20` 的基础上，额外加入 `boundary CE` 做单变量实验。
 - 85% 训练集开发实验：`boundary CE` 版本最佳验证 F-score 为 `0.7539`，出现在第 `28` 个 epoch。
-- 这次实验是有效增益方向，但当前仍略低于 `wolr_weighted_sqrt_d7c3_st20` 的最佳验证 F-score `0.7641`。
-- 当前判断：`boundary CE` 可以保留为有效候选方案，但暂不更新为新的本地最佳配置。
+- 该实验方向可行，但当前配置下未超过 `wolr_weighted_sqrt_d7c3_st20` 的最佳验证 F-score `0.7641`。
+- 当前判断：`boundary CE` 保留为候选方案，但暂不更新为新的本地最佳配置。
+- 85% 训练集开发实验：`boundary CE` + `Dice:CE=5:5`（由 `7:3` 调整）最佳验证 F-score 为 `0.7597`，仍未超过当前本地最佳 `0.7641`。
+- 结论：该配置不作为主线，模型文件不保留。
+- 85% 训练集开发实验：`focal CE` 版本（`focal_wolr_weighted_sqrt_d7c3_st10`）最佳验证 F-score 为 `0.7612`，出现在第 `27` 个 epoch。
+- 85% 训练集开发实验：`less crop` 版本（`lesscrop_wolr_weighted_sqrt_d7c3_st10`）最佳验证 F-score 为 `0.7597`，出现在第 `40` 个 epoch。
+- 85% 训练集开发实验：`refine head` 版本（`refinehead_wolr_weighted_sqrt_d7c3_st10`）最佳验证 F-score 为 `0.7526`，出现在第 `29` 个 epoch。
+- 对比结论：当前新增实验（`boundary CE`、`focal CE`、`less crop`、`refine head`）均未超过本地最佳 `0.7641`，主配置暂不变更。
+- 85% 训练集开发实验：在当前主线配置上加入新的增强策略（`augmix_wolr_weighted_sqrt_d7c3_st10`），当前已达到最佳验证 F-score `0.7677`（超过此前本地最佳 `0.7641`）。
+- 基于 `augmix_wolr_weighted_sqrt_d7c3_st10` 的 `best_model.pth` 已生成可提交压缩包：`submissions/augmix_wolr_weighted_sqrt_d7c3_st10.zip`（`masks/*.png`）。
+- 训练框架已接入 `Lovasz-Softmax`（`ce_type=lovasz`），作为与 F-measure 更一致的 surrogate loss；下一步在 `augmix` 基线上开始对照实验。
 
 ### 最终训练与选模策略
 
@@ -71,9 +80,41 @@
 - 结论：当前全量训练最终候选为 `epoch 41`，`epoch 45` 不再作为主候选继续使用。
 - 目前 `0.84` 与此前最佳线上结果持平，说明当前主配置已经具备稳定复现能力。
 
+### 类别映射核对（用于后处理）
+
+- 已完成可视化核对，`id=3` 确认为“眼镜（glasses）”。
+- 当前按项目数据核对得到的映射如下（按人物左右定义，括号内为画面左右说明）：
+- `0`: background
+- `1`: skin
+- `2`: nose
+- `3`: glasses
+- `4`: left eye（画面右侧）
+- `5`: right eye（画面左侧）
+- `6`: left brow（画面右侧）
+- `7`: right brow（画面左侧）
+- `8`: left ear（画面右侧）
+- `9`: right ear（画面左侧）
+- `10`: mouth inner（上下唇之间）
+- `11`: upper lip
+- `12`: lower lip
+- `13`: hair
+- `14`: hat
+- `15`: ear accessories
+- `16`: necklace（待进一步确认）
+- `17`: neck
+- `18`: cloth
+- 备注：后处理阶段优先只对 `hair/background/skin` 做碎块与边界平滑，避免误伤小器官类（眼睛、嘴唇、耳饰等）。
+
+### 后处理压缩包实验记录
+
+- 基线无后处理：线上 `0.84`（当前最佳，作为对照）。
+- `mainonly_post.zip`：主块并类（默认全非背景类参与），线上结果 `0.83`（未提升）。
+- `mainonly_no151618_post.zip`：主块并类，排除 `15/16/18`（耳饰/项链/衣服），已生成压缩包，待线上验证。
+- `mainonly_relaxed_post.zip`：主块并类（仅 `3,4,5,6,7,8,9,10,11,12,14` 参与；`1/2/13/17` 允许多块），已生成压缩包，待线上验证。
+- 结论更新：后处理目前“视觉更平滑”但尚未带来分数提升，暂不替代基线提交。
+
 ### TODO
 
-- 使用当前最佳方案在全量训练集（100%）上训练最终提交模型。
 - 明天（3月12日）重点处理头发区域误分问题，优先关注 `hair vs background` 边界质量。
 - 观察到预测掩码存在明显碎斑与锯齿边缘（例如帽子区域被预测成一块一块的小区域），需要专项处理。
 - 尝试推理后处理以减少碎斑噪声：小连通域过滤、轻量闭运算、局部多数投票滤波（先做可开关版本便于对照）。

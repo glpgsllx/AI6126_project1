@@ -316,6 +316,8 @@ def main(args):
         print(f"Using weighted CE: {args.weighted_ce}")
         print(f"Weight transform: {args.weighted_ce_transform} | clip_max: {args.weighted_ce_clip_max}")
         print(f"CE class weights: {[round(float(x), 4) for x in ce_class_weights.cpu().tolist()]}")
+        if args.ce_type == 'lovasz':
+            print("Note: ce_type=lovasz ignores CE class weights and boundary CE settings.")
 
     criterion = CombinedLoss(
         num_classes=args.num_classes,
@@ -473,7 +475,7 @@ if __name__ == '__main__':
     parser.add_argument('--boundary_ce_factor', type=float, default=0.0,
                         help='Extra CE weight applied to boundary pixels. 0 disables boundary-weighted CE.')
     parser.add_argument('--ce_type', type=str, default='ce',
-                        choices=['ce', 'focal'],
+                        choices=['ce', 'focal', 'lovasz'],
                         help='Type of classification loss combined with Dice.')
     parser.add_argument('--focal_gamma', type=float, default=2.0,
                         help='Gamma used when ce_type=focal.')

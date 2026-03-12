@@ -1,0 +1,11 @@
+!ARCH=deeplab \
+EXP_NAME=refinehead_wolr_weighted_sqrt_d7c3_st10 \
+LR=1e-3 \
+DICE_WEIGHT=0.7 \
+CE_WEIGHT=0.3 \
+VAL_SPLIT=0.15 \
+EARLY_STOP_PATIENCE=10 \
+WEIGHTED_CE=median_freq \
+WEIGHTED_CE_TRANSFORM=sqrt \
+DATA_DIR=./data \
+./run_train.sh

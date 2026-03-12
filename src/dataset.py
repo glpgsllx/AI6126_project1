@@ -1,6 +1,7 @@
 import os
+import io
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as T
@@ -92,4 +93,41 @@ class FaceParsingDataset(Dataset):
             image = TF.adjust_saturation(image, random.uniform(0.8, 1.2))
             image = TF.adjust_hue(image, random.uniform(-0.05, 0.05))
 
+        # Weak Gaussian blur (image only)
+        if random.random() < 0.2:
+            image = image.filter(ImageFilter.GaussianBlur(radius=1.0))
+
+        # Weak JPEG compression artifact simulation (image only)
+        if random.random() < 0.2:
+            image = self._jpeg_compress(image, quality_min=70, quality_max=95)
+
+        # Random noise cutout (image only): 1 hole, 4%-6% area
+        if random.random() < 0.2:
+            image = self._random_noise_cutout(image, min_area_ratio=0.04, max_area_ratio=0.06)
+
         return image, mask
+
+    def _random_noise_cutout(self, image, min_area_ratio=0.04, max_area_ratio=0.06):
+        w, h = image.size
+        img_np = np.array(image, dtype=np.uint8)
+
+        area = w * h
+        target_area = random.uniform(min_area_ratio, max_area_ratio) * area
+        aspect = random.uniform(0.75, 1.33)
+        hole_w = int(round((target_area * aspect) ** 0.5))
+        hole_h = int(round((target_area / max(aspect, 1e-6)) ** 0.5))
+        hole_w = max(1, min(hole_w, w))
+        hole_h = max(1, min(hole_h, h))
+
+        x0 = random.randint(0, w - hole_w)
+        y0 = random.randint(0, h - hole_h)
+        noise = np.random.randint(0, 256, size=(hole_h, hole_w, 3), dtype=np.uint8)
+        img_np[y0:y0 + hole_h, x0:x0 + hole_w] = noise
+        return Image.fromarray(img_np)
+
+    def _jpeg_compress(self, image, quality_min=70, quality_max=95):
+        quality = random.randint(quality_min, quality_max)
+        buf = io.BytesIO()
+        image.save(buf, format='JPEG', quality=quality)
+        buf.seek(0)
+        return Image.open(buf).convert('RGB')
