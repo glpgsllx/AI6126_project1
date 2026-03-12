@@ -78,7 +78,7 @@ class FaceParsingDataset(Dataset):
         # Random crop and resize
         if random.random() > 0.5:
             i, j, h, w = T.RandomResizedCrop.get_params(
-                image, scale=(0.8, 1.0), ratio=(0.9, 1.1)
+                image, scale=(0.8, 1.0), ratio=(0.9, 1.1) # image, scale=(0.8, 1.0), ratio=(0.9, 1.1)
             )
             image = TF.resized_crop(image, i, j, h, w,
                                     (self.img_size, self.img_size), Image.BILINEAR)

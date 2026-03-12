@@ -31,6 +31,9 @@ WEIGHTED_CE_TRANSFORM="${WEIGHTED_CE_TRANSFORM:-none}"
 WEIGHTED_CE_CLIP_MAX="${WEIGHTED_CE_CLIP_MAX:-0}"
 DICE_WEIGHT="${DICE_WEIGHT:-0.5}"
 CE_WEIGHT="${CE_WEIGHT:-0.5}"
+BOUNDARY_CE_FACTOR="${BOUNDARY_CE_FACTOR:-0}"
+CE_TYPE="${CE_TYPE:-ce}"
+FOCAL_GAMMA="${FOCAL_GAMMA:-2.0}"
 SAVE_EPOCHS="${SAVE_EPOCHS:-}"
 SAVE_BEST_TRAIN_LOSS="${SAVE_BEST_TRAIN_LOSS:-0}"
 SAVE_LAST="${SAVE_LAST:-1}"
@@ -102,5 +105,8 @@ python3 -u train.py \
   --weighted_ce_clip_max "${WEIGHTED_CE_CLIP_MAX}" \
   --dice_weight "${DICE_WEIGHT}" \
   --ce_weight "${CE_WEIGHT}" \
+  --boundary_ce_factor "${BOUNDARY_CE_FACTOR}" \
+  --ce_type "${CE_TYPE}" \
+  --focal_gamma "${FOCAL_GAMMA}" \
   --save_epochs "${SAVE_EPOCHS}" \
   "${extra_args[@]}"

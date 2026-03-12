@@ -322,6 +322,9 @@ def main(args):
         dice_weight=args.dice_weight,
         ce_weight=args.ce_weight,
         ce_class_weights=ce_class_weights,
+        boundary_ce_factor=args.boundary_ce_factor if args.ce_type == 'ce' else 0.0,
+        ce_type=args.ce_type,
+        focal_gamma=args.focal_gamma,
     )
     optimizer = AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
     scheduler = CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
@@ -467,6 +470,13 @@ if __name__ == '__main__':
                         help='If > 0, clip CE class weights to this maximum value.')
     parser.add_argument('--dice_weight', type=float, default=0.5)
     parser.add_argument('--ce_weight', type=float, default=0.5)
+    parser.add_argument('--boundary_ce_factor', type=float, default=0.0,
+                        help='Extra CE weight applied to boundary pixels. 0 disables boundary-weighted CE.')
+    parser.add_argument('--ce_type', type=str, default='ce',
+                        choices=['ce', 'focal'],
+                        help='Type of classification loss combined with Dice.')
+    parser.add_argument('--focal_gamma', type=float, default=2.0,
+                        help='Gamma used when ce_type=focal.')
     parser.add_argument('--save_epochs', type=str, default='',
                         help='Comma-separated epoch numbers to save extra checkpoints, e.g. "41,45".')
     parser.add_argument('--save_best_train_loss', action='store_true', default=False,

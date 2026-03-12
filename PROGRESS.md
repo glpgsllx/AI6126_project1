@@ -10,6 +10,7 @@
 
 ### 已确认的实验结果
 
+- `wolr_weighted_sqrt_d7c3_st20`：最佳 F-score 为 `0.7641`，出现在第 `48` 个 epoch
 - `weighted_sqrt_d7c3_st20`：最佳 F-score 为 `0.7027261973759753`，出现在第 `26` 个 epoch
 - `deeplab_d7c3`：最佳 F-score 为 `0.7022866198657503`，出现在第 `24` 个 epoch
 - `deeplab_baseline`：最佳 F-score 为 `0.6937163352614634`，出现在第 `42` 个 epoch
@@ -18,7 +19,7 @@
 
 - `best_model.pth` 不是按最后一个 epoch 保存，而是按验证集最高 `F-score` 保存。
 - 上述最高分已经通过扫描所有已保存 `metrics.csv` 的历史峰值确认过。
-- 当前已保存实验中，最高验证分数是 `0.7027261973759753`，目录为 `checkpoints/deeplab/weighted_sqrt_d7c3_st20/`。
+- 当前已保存实验中，最高验证分数是 `0.7641`，目录为 `checkpoints/deeplab/wolr_weighted_sqrt_d7c3_st20/`。
 
 
 
@@ -45,10 +46,14 @@
 - 先从 [src/dataset.py](/Users/chenyixuan/Documents/NTU课程/ACV/AI6126_project1/src/dataset.py) 中移除水平翻转增强。
 - 再将旋转增强中 `mask` 的填充值改为 `ignore_index=255`（之前默认会填成 `0` 背景类）。
 - 修改后，旋转产生的外扩区域不会被当作真实背景参与训练损失计算。
-- 85% 训练集开发实验：`去掉水平翻转` 版本已先提交一次，线上分数 `0.84`。
+- 85% 训练集开发实验：`去掉水平翻转` 版本已先提交一次，线上分数 `0.84`。最佳验证 `0.7641`，出现在第48个epoch。
 - 85% 训练集开发实验：`去掉水平翻转 + 旋转 fill=255`（`wolr_fillrot_weighted_sqrt_d7c3_st20`）最佳验证 F-score 为 `0.7581`，出现在第 `45` 个 epoch。
 - 线上提交结果：`wolr_fillrot_weighted_sqrt_d7c3_st2.zip`（2026-03-11 23:14）得分 `0.83`。
 - 对比结论：当前不采用 `fill=255` 这一改动作为最终提交方案，最终全量训练优先使用“仅去掉水平翻转”的版本。
+- 在当前最佳开发配置 `wolr_weighted_sqrt_d7c3_st20` 的基础上，额外加入 `boundary CE` 做单变量实验。
+- 85% 训练集开发实验：`boundary CE` 版本最佳验证 F-score 为 `0.7539`，出现在第 `28` 个 epoch。
+- 这次实验是有效增益方向，但当前仍略低于 `wolr_weighted_sqrt_d7c3_st20` 的最佳验证 F-score `0.7641`。
+- 当前判断：`boundary CE` 可以保留为有效候选方案，但暂不更新为新的本地最佳配置。
 
 ### 最终训练与选模策略
 
@@ -58,6 +63,13 @@
 - 同时考虑全量数据可能使最优点后移，在同一次训练中额外保存 `epoch 45` 作为备选。
 - 执行方式是一次训练跑到 45 个 epoch，并通过 `SAVE_EPOCHS=41,45` 同时导出两个候选权重。
 - 最终以线上提交得分对比 `epoch 41` 与 `epoch 45`，选更高者作为最终结果。
+
+### 全量训练线上结果
+
+- `epoch 41` 对应的线上提交得分为 `0.84`。
+- `epoch 45` 对应的线上提交得分为 `0.83`。
+- 结论：当前全量训练最终候选为 `epoch 41`，`epoch 45` 不再作为主候选继续使用。
+- 目前 `0.84` 与此前最佳线上结果持平，说明当前主配置已经具备稳定复现能力。
 
 ### TODO
 
