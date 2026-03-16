@@ -134,6 +134,12 @@ def get_model(arch, num_classes, base_ch):
     elif arch == 'deeplab':
         from src.model_b_deeplab import LightDeepLab, count_parameters
         model = LightDeepLab(in_ch=3, num_classes=num_classes, base_ch=base_ch)
+    elif arch == 'deeplab_aspp4812':
+        from src.model_b_deeplab_aspp4812 import LightDeepLabASPP4812, count_parameters
+        model = LightDeepLabASPP4812(in_ch=3, num_classes=num_classes, base_ch=base_ch)
+    elif arch == 'deeplab_dwstage3':
+        from src.model_b_deeplab_dwstage3 import LightDeepLabDWStage3, count_parameters
+        model = LightDeepLabDWStage3(in_ch=3, num_classes=num_classes, base_ch=base_ch)
     elif arch == 'segnet':
         from src.model_c_segnet import LightSegNet, count_parameters
         model = LightSegNet(in_ch=3, num_classes=num_classes, base_ch=base_ch)
@@ -434,7 +440,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--arch', type=str, default='attention_unet',
-                        choices=['attention_unet', 'deeplab', 'segnet'])
+                        choices=['attention_unet', 'deeplab', 'deeplab_aspp4812', 'deeplab_dwstage3', 'segnet'])
     parser.add_argument('--data_dir', type=str, default='./data')
     parser.add_argument('--save_dir', type=str, default='./checkpoints')
     parser.add_argument('--num_classes', type=int, default=19)

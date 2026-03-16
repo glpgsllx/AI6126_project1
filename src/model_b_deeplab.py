@@ -114,7 +114,7 @@ class LightDeepLab(nn.Module):
             nn.Conv2d(b * 4 + 32, b * 2, 3, padding=1, bias=False),
             nn.BatchNorm2d(b * 2), nn.ReLU(inplace=True),
             DepthwiseSeparableConv(b * 2, b * 2),
-            nn.Conv2d(b * 2, num_classes, 1)
+            nn.Conv2d(b * 2, num_classes, 1)    
         )
 
     def forward(self, x):
