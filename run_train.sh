@@ -10,6 +10,8 @@ set -euo pipefail
 #     ARCH=deeplab ./run_train.sh
 #   DeepLab (ASPP rates 4/8/12 ablation):
 #     ARCH=deeplab_aspp4812 ./run_train.sh
+#   DeepLab (SE + asymmetric residual block ablation):
+#     ARCH=deeplab_seasym ./run_train.sh
 #   DeepLab (DW stage3 deeper ablation):
 #     ARCH=deeplab_dwstage3 ./run_train.sh
 #   SegNet:
@@ -21,7 +23,7 @@ set -euo pipefail
 #   Override defaults:
 #     ARCH=deeplab EPOCHS=120 BATCH_SIZE=12 NUM_WORKERS=2 ./run_train.sh
 
-ARCH="${ARCH:-attention_unet}"         # attention_unet | dwunet | deeplab | deeplab_aspp4812 | deeplab_dwstage3 | segnet
+ARCH="${ARCH:-attention_unet}"         # attention_unet | dwunet | deeplab | deeplab_aspp4812 | deeplab_seasym | deeplab_dwstage3 | segnet
 DATA_DIR="${DATA_DIR:-./data}"
 SAVE_DIR="${SAVE_DIR:-./checkpoints}"
 NUM_CLASSES="${NUM_CLASSES:-19}"
@@ -70,6 +72,14 @@ case "${ARCH}" in
     NUM_WORKERS="${NUM_WORKERS:-4}"
     ;;
   deeplab_aspp4812)
+    IMG_SIZE="${IMG_SIZE:-512}"
+    BASE_CH="${BASE_CH:-32}"
+    BATCH_SIZE="${BATCH_SIZE:-32}"
+    EPOCHS="${EPOCHS:-100}"
+    LR="${LR:-1e-3}"
+    NUM_WORKERS="${NUM_WORKERS:-4}"
+    ;;
+  deeplab_seasym)
     IMG_SIZE="${IMG_SIZE:-512}"
     BASE_CH="${BASE_CH:-32}"
     BATCH_SIZE="${BATCH_SIZE:-32}"
