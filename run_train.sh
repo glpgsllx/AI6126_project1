@@ -4,6 +4,8 @@ set -euo pipefail
 # Usage:
 #   Attention U-Net:
 #     ./run_train.sh
+#   DW U-Net:
+#     ARCH=dwunet ./run_train.sh
 #   DeepLab:
 #     ARCH=deeplab ./run_train.sh
 #   DeepLab (ASPP rates 4/8/12 ablation):
@@ -19,7 +21,7 @@ set -euo pipefail
 #   Override defaults:
 #     ARCH=deeplab EPOCHS=120 BATCH_SIZE=12 NUM_WORKERS=2 ./run_train.sh
 
-ARCH="${ARCH:-attention_unet}"         # attention_unet | deeplab | deeplab_aspp4812 | deeplab_dwstage3 | segnet
+ARCH="${ARCH:-attention_unet}"         # attention_unet | dwunet | deeplab | deeplab_aspp4812 | deeplab_dwstage3 | segnet
 DATA_DIR="${DATA_DIR:-./data}"
 SAVE_DIR="${SAVE_DIR:-./checkpoints}"
 NUM_CLASSES="${NUM_CLASSES:-19}"
@@ -46,6 +48,14 @@ case "${ARCH}" in
   attention_unet)
     IMG_SIZE="${IMG_SIZE:-512}"
     BASE_CH="${BASE_CH:-15}"
+    BATCH_SIZE="${BATCH_SIZE:-24}"
+    EPOCHS="${EPOCHS:-100}"
+    LR="${LR:-1e-3}"
+    NUM_WORKERS="${NUM_WORKERS:-4}"
+    ;;
+  dwunet)
+    IMG_SIZE="${IMG_SIZE:-512}"
+    BASE_CH="${BASE_CH:-34}"
     BATCH_SIZE="${BATCH_SIZE:-24}"
     EPOCHS="${EPOCHS:-100}"
     LR="${LR:-1e-3}"

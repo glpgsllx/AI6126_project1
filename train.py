@@ -131,6 +131,9 @@ def get_model(arch, num_classes, base_ch):
     if arch == 'attention_unet':
         from src.model import AttentionUNet, count_parameters
         model = AttentionUNet(in_ch=3, num_classes=num_classes, base_ch=base_ch)
+    elif arch == 'dwunet':
+        from src.model_a_dwunet import AttentionUNet, count_parameters
+        model = AttentionUNet(in_ch=3, num_classes=num_classes, base_ch=base_ch)
     elif arch == 'deeplab':
         from src.model_b_deeplab import LightDeepLab, count_parameters
         model = LightDeepLab(in_ch=3, num_classes=num_classes, base_ch=base_ch)
@@ -440,7 +443,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--arch', type=str, default='attention_unet',
-                        choices=['attention_unet', 'deeplab', 'deeplab_aspp4812', 'deeplab_dwstage3', 'segnet'])
+                        choices=['attention_unet', 'dwunet', 'deeplab', 'deeplab_aspp4812', 'deeplab_dwstage3', 'segnet'])
     parser.add_argument('--data_dir', type=str, default='./data')
     parser.add_argument('--save_dir', type=str, default='./checkpoints')
     parser.add_argument('--num_classes', type=int, default=19)
